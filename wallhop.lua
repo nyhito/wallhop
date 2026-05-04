@@ -1,7 +1,5 @@
--- (Modified from nyhito)
--- Mobile only version
--- Beast Slow removed completely
--- Double Jump removed completely
+-- Made by nyhito
+-- The Best Wallhop Script
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
