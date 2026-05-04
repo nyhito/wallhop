@@ -890,9 +890,9 @@ local function pickNextFlick(useSpecialFirst)
 	local minAngle, maxAngle
 
 	if useSpecialFirst then
-		minAngle, maxAngle = 70, 80
+		minAngle, maxAngle = 75, 90
 	else
-		minAngle, maxAngle = 65, 80
+		minAngle, maxAngle = 80, 90
 	end
 
 	local attempt = 0
@@ -910,9 +910,9 @@ end
 local function getFlickProfile(useSpecialFirst)
 	if useSpecialFirst then
 		return {
-			goSteps = math.random(2, 3),
-			goDelayMin = 0.0095,
-			goDelayMax = 0.0120,
+			goSteps = math.random(3, 4),
+			goDelayMin = 0.0130,
+			goDelayMax = 0.0165,
 			holdTime = 0.01,
 			returnSteps = math.random(2, 3),
 			returnDelayMin = 0.0095,
@@ -927,9 +927,9 @@ local function getFlickProfile(useSpecialFirst)
 
 	if flickRoll < 0.10 then
 		return {
-			goSteps = math.random(2, 3),
-			goDelayMin = 0.0080,
-			goDelayMax = 0.0103,
+			goSteps = math.random(3, 4),
+			goDelayMin = 0.0118,
+			goDelayMax = 0.0148,
 			holdTime = 0.01,
 			returnSteps = math.random(2, 3),
 			returnDelayMin = 0.0080,
@@ -940,9 +940,9 @@ local function getFlickProfile(useSpecialFirst)
 		}
 	elseif flickRoll < 0.40 then
 		return {
-			goSteps = math.random(3, 4),
-			goDelayMin = 0.0085,
-			goDelayMax = 0.0110,
+			goSteps = math.random(4, 5),
+			goDelayMin = 0.0122,
+			goDelayMax = 0.0155,
 			holdTime = 0.01,
 			returnSteps = math.random(3, 4),
 			returnDelayMin = 0.0085,
@@ -953,9 +953,9 @@ local function getFlickProfile(useSpecialFirst)
 		}
 	else
 		return {
-			goSteps = math.random(2, 3),
-			goDelayMin = 0.0090,
-			goDelayMax = 0.0119,
+			goSteps = math.random(3, 4),
+			goDelayMin = 0.0128,
+			goDelayMax = 0.0162,
 			holdTime = 0.01,
 			returnSteps = math.random(2, 3),
 			returnDelayMin = 0.0090,
