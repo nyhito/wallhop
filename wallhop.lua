@@ -161,6 +161,8 @@ MobileCornerWalkRow = nil
 MobileXrayRow = nil
 MobileRealXrayRow = nil
 MobileDance2TurnRow = nil
+MobileAutoInteractRow = nil
+MobilePlayersESPRow = nil
 MobileFloorbangEspRow = nil
 MobileHideGuiRow = nil
 
@@ -174,6 +176,10 @@ mobileRealXraySwitch = nil
 mobileRealXrayKnob = nil
 mobileDance2TurnSwitch = nil
 mobileDance2TurnKnob = nil
+mobileAutoInteractSwitch = nil
+mobileAutoInteractKnob = nil
+mobilePlayersESPSwitch = nil
+mobilePlayersESPKnob = nil
 mobileFloorbangEspSwitch = nil
 mobileFloorbangEspKnob = nil
 mobileHideGuiSwitch = nil
@@ -199,7 +205,10 @@ isCornerWalkEnabled = false
 isXrayEnabled = false
 realXrayEnabled = false -- X-ray removido
 isDance2TurnEnabled = false
+isAutoInteractEnabled = false
+isPlayersESPEnabled = false
 isFloorbangEspEnabled = false -- Floorbang ESP removido
+playerESPHighlights = {}
 floorbangEspMarkers = {}
 FLOORBANG_HORIZONTAL_RANGE = 35
 dance2TurnToken = 0
@@ -401,6 +410,8 @@ local function saveUserPreferences()
 		isCornerWalkEnabled = isCornerWalkEnabled,
 		isNonSpamEnabled = isXrayEnabled,
 		isDance2TurnEnabled = isDance2TurnEnabled,
+		isAutoInteractEnabled = isAutoInteractEnabled,
+		isPlayersESPEnabled = isPlayersESPEnabled,
 		mobileWallhopGuiHidden = mobileWallhopGuiHidden,
 		mobileCornerWalkButtonVisible = mobileCornerWalkButtonVisible,
 		mobileMenuOpen = mobileMenuOpen,
@@ -455,6 +466,12 @@ local function loadUserPreferences()
 		end
 		if type(decoded.isDance2TurnEnabled) == "boolean" then
 			isDance2TurnEnabled = decoded.isDance2TurnEnabled
+		end
+		if type(decoded.isAutoInteractEnabled) == "boolean" then
+			isAutoInteractEnabled = decoded.isAutoInteractEnabled
+		end
+		if type(decoded.isPlayersESPEnabled) == "boolean" then
+			isPlayersESPEnabled = decoded.isPlayersESPEnabled
 		end
 		if type(decoded.mobileWallhopGuiHidden) == "boolean" then
 			mobileWallhopGuiHidden = decoded.mobileWallhopGuiHidden
@@ -1219,6 +1236,223 @@ updateFlickButtons = function()
 	end
 end
 
+
+local autoInteractTargets = {}
+local autoInteractOriginalHoldDurations = {}
+
+local function cacheAutoInteractTarget(obj)
+	if obj and obj:IsA("ProximityPrompt") then
+		autoInteractTargets[obj] = true
+	end
+end
+
+local function scanAutoInteractTargets()
+	table.clear(autoInteractTargets)
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		cacheAutoInteractTarget(obj)
+	end
+end
+
+local function applyInstantAutoInteractToPrompt(prompt)
+	if not prompt or not prompt.Parent or not prompt:IsA("ProximityPrompt") then
+		autoInteractTargets[prompt] = nil
+		return
+	end
+
+	if autoInteractOriginalHoldDurations[prompt] == nil then
+		autoInteractOriginalHoldDurations[prompt] = prompt.HoldDuration
+	end
+
+	-- Faz o botão de interação concluir instantaneamente quando o usuário toca/clica nele.
+	if prompt.HoldDuration ~= 0 then
+		pcall(function()
+			prompt.HoldDuration = 0
+		end)
+	end
+end
+
+local function applyInstantAutoInteract()
+	for prompt in pairs(autoInteractTargets) do
+		applyInstantAutoInteractToPrompt(prompt)
+	end
+end
+
+local function restoreAutoInteractPrompts()
+	for prompt, oldHoldDuration in pairs(autoInteractOriginalHoldDurations) do
+		if prompt and prompt.Parent and prompt:IsA("ProximityPrompt") then
+			pcall(function()
+				prompt.HoldDuration = oldHoldDuration
+			end)
+		end
+	end
+
+	table.clear(autoInteractOriginalHoldDurations)
+end
+
+local function setAutoInteractEnabled(state)
+	isAutoInteractEnabled = state and true or false
+
+	if isAutoInteractEnabled then
+		scanAutoInteractTargets()
+		applyInstantAutoInteract()
+	else
+		restoreAutoInteractPrompts()
+	end
+
+	updateMobilePanelButtons()
+	saveUserPreferences()
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+	cacheAutoInteractTarget(obj)
+
+	if isAutoInteractEnabled and obj:IsA("ProximityPrompt") then
+		task.defer(function()
+			applyInstantAutoInteractToPrompt(obj)
+		end)
+	end
+end)
+
+workspace.DescendantRemoving:Connect(function(obj)
+	if autoInteractTargets[obj] then
+		autoInteractTargets[obj] = nil
+	end
+
+	if autoInteractOriginalHoldDurations[obj] ~= nil then
+		autoInteractOriginalHoldDurations[obj] = nil
+	end
+end)
+
+RunService.Heartbeat:Connect(function()
+	if isThisScriptActive and not isThisScriptActive() then
+		return
+	end
+
+	if not isAutoInteractEnabled then
+		return
+	end
+
+	-- Não clica automaticamente.
+	-- Só mantém HoldDuration = 0 para o usuário interagir instantaneamente quando apertar o botão.
+	applyInstantAutoInteract()
+end)
+
+
+local function removePlayersESP(player)
+	local highlight = playerESPHighlights[player]
+	if highlight then
+		pcall(function()
+			highlight:Destroy()
+		end)
+	end
+
+	playerESPHighlights[player] = nil
+end
+
+local function clearPlayersESP()
+	for player in pairs(playerESPHighlights) do
+		removePlayersESP(player)
+	end
+end
+
+local function createOrUpdatePlayersESP(player)
+	if not isPlayersESPEnabled or not player or player == LocalPlayer then
+		return
+	end
+
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not character or not humanoid or humanoid.Health <= 0 then
+		removePlayersESP(player)
+		return
+	end
+
+	local highlight = playerESPHighlights[player]
+	if not highlight or not highlight.Parent then
+		highlight = Instance.new("Highlight")
+		highlight.Name = "CerberXPlayersESP"
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillTransparency = 0.45
+		highlight.OutlineTransparency = 0.1
+		highlight.FillColor = Color3.fromRGB(45, 45, 48)
+		highlight.OutlineColor = Color3.fromRGB(45, 45, 48)
+		highlight.Parent = character
+		playerESPHighlights[player] = highlight
+	end
+
+	highlight.Adornee = character
+	highlight.FillColor = Color3.fromRGB(45, 45, 48)
+	highlight.OutlineColor = Color3.fromRGB(45, 45, 48)
+end
+
+local function updatePlayersESP()
+	if not isPlayersESPEnabled then
+		clearPlayersESP()
+		return
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			createOrUpdatePlayersESP(player)
+		end
+	end
+
+	for player in pairs(playerESPHighlights) do
+		if not player or not player.Parent or player == LocalPlayer or not player.Character then
+			removePlayersESP(player)
+		end
+	end
+end
+
+local function setPlayersESPEnabled(state)
+	isPlayersESPEnabled = state and true or false
+
+	if isPlayersESPEnabled then
+		updatePlayersESP()
+	else
+		clearPlayersESP()
+	end
+
+	updateMobilePanelButtons()
+	saveUserPreferences()
+end
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
+		task.wait(0.25)
+		if isPlayersESPEnabled then
+			createOrUpdatePlayersESP(player)
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	removePlayersESP(player)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer then
+		player.CharacterAdded:Connect(function()
+			task.wait(0.25)
+			if isPlayersESPEnabled then
+				createOrUpdatePlayersESP(player)
+			end
+		end)
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	if isThisScriptActive and not isThisScriptActive() then
+		clearPlayersESP()
+		return
+	end
+
+	if isPlayersESPEnabled then
+		updatePlayersESP()
+	end
+end)
+
 updateMobilePanelButtons = function()
 	if MobileHideGuiRow and MobileHideGuiRow:FindFirstChild("Label") then
 		MobileHideGuiRow.Label.Text = "Wallhop"
@@ -1231,6 +1465,12 @@ updateMobilePanelButtons = function()
 	end
 	if MobileDance2TurnRow and MobileDance2TurnRow:FindFirstChild("Label") then
 		MobileDance2TurnRow.Label.Text = "Clip Dance2"
+	end
+	if MobileAutoInteractRow and MobileAutoInteractRow:FindFirstChild("Label") then
+		MobileAutoInteractRow.Label.Text = "Auto-interact"
+	end
+	if MobilePlayersESPRow and MobilePlayersESPRow:FindFirstChild("Label") then
+		MobilePlayersESPRow.Label.Text = "Players ESP"
 	end
 	if MobileNormalWallhopRow and MobileNormalWallhopRow:FindFirstChild("Label") then
 		MobileNormalWallhopRow.Label.Text = "Normal Wallhop"
@@ -1249,6 +1489,8 @@ updateMobilePanelButtons = function()
 	updateSwitchVisual(mobileCornerWalkSwitch, mobileCornerWalkKnob, mobileCornerWalkButtonVisible)
 	updateSwitchVisual(mobileXraySwitch, mobileXrayKnob, isXrayEnabled)
 	updateSwitchVisual(mobileDance2TurnSwitch, mobileDance2TurnKnob, isDance2TurnEnabled)
+	updateSwitchVisual(mobileAutoInteractSwitch, mobileAutoInteractKnob, isAutoInteractEnabled)
+	updateSwitchVisual(mobilePlayersESPSwitch, mobilePlayersESPKnob, isPlayersESPEnabled)
 
 	setMobileWallhopVisualHidden(mobileWallhopGuiHidden)
 	setMobileCornerWalkButtonVisible(mobileCornerWalkButtonVisible)
@@ -2304,7 +2546,7 @@ local function buildMobileGui()
 	MobileFunctionsPage.BorderSizePixel = 0
 	MobileFunctionsPage.ScrollBarThickness = 3
 	MobileFunctionsPage.ScrollingDirection = Enum.ScrollingDirection.Y
-	MobileFunctionsPage.CanvasSize = UDim2.new(0, 0, 0, 245)
+	MobileFunctionsPage.CanvasSize = UDim2.new(0, 0, 0, 330)
 	MobileFunctionsPage.Parent = MobilePanel
 
 	MobileFlicksPage = Instance.new("ScrollingFrame")
@@ -2337,6 +2579,8 @@ local function buildMobileGui()
 	MobileXrayRow, mobileXraySwitch, mobileXrayKnob = createSwitchRow(MobileFunctionsPage, 72, "Non-spam")
 	MobileCornerWalkRow, mobileCornerWalkSwitch, mobileCornerWalkKnob = createSwitchRow(MobileFunctionsPage, 114, "Corner Walk")
 	MobileDance2TurnRow, mobileDance2TurnSwitch, mobileDance2TurnKnob = createSwitchRow(MobileFunctionsPage, 156, "Clip Dance2")
+	MobileAutoInteractRow, mobileAutoInteractSwitch, mobileAutoInteractKnob = createSwitchRow(MobileFunctionsPage, 198, "Auto-interact")
+	MobilePlayersESPRow, mobilePlayersESPSwitch, mobilePlayersESPKnob = createSwitchRow(MobileFunctionsPage, 240, "Players ESP")
 
 	MobileFlickTypesTitle = Instance.new("TextLabel")
 	MobileFlickTypesTitle.Size = UDim2.new(1, -14, 0, 22)
@@ -2548,6 +2792,14 @@ local function buildMobileGui()
 		setDance2TurnEnabled(not isDance2TurnEnabled)
 	end)
 
+	bindRowPress(MobileAutoInteractRow and MobileAutoInteractRow:FindFirstChild("SwitchHitbox"), function()
+		setAutoInteractEnabled(not isAutoInteractEnabled)
+	end)
+
+	bindRowPress(MobilePlayersESPRow and MobilePlayersESPRow:FindFirstChild("SwitchHitbox"), function()
+		setPlayersESPEnabled(not isPlayersESPEnabled)
+	end)
+
 
 	bindRowPress(MobileNormalWallhopRow, function()
 		setFlickMode("Normal Wallhop")
@@ -2578,6 +2830,12 @@ local function buildMobileGui()
 	end)
 
 	switchMobileTab("Functions")
+	if isAutoInteractEnabled then
+		scanAutoInteractTargets()
+	end
+	if isPlayersESPEnabled then
+		updatePlayersESP()
+	end
 	updateMobilePanelButtons()
 	updateSettingsInputs()
 end
@@ -4915,4 +5173,4 @@ updateMobilePanelButtons()
 updateFlickButtons()
 applyVisibility()
 
-print("Cerber X V1.1 • Mobile Loaded Successfully ✅")
+print("Cerber X V1.1 • Normal Loaded Successfully ✅")
