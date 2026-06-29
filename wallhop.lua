@@ -1,5 +1,6 @@
 -- Cerber X V1.1 (Made by nyhito)
 -- All Credits: nyhito (tester, config and uploader)
+-- The Best Flee the Facility Script
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -1242,6 +1243,7 @@ end
 local autoInteractTargets = {}
 local autoInteractOriginalHoldDurations = {}
 local autoInteractConnection = nil
+local autoInteractShownConnection = nil
 local isInstaInteractEnabled = false
 
 local function cacheAutoInteractTarget(obj)
@@ -1328,6 +1330,11 @@ local function setAutoInteractEnabled(state)
 		autoInteractConnection = nil
 	end
 
+	if autoInteractShownConnection then
+		autoInteractShownConnection:Disconnect()
+		autoInteractShownConnection = nil
+	end
+
 	if isAutoInteractEnabled then
 		for _, obj in ipairs(workspace:GetDescendants()) do
 			if obj:IsA("ProximityPrompt") then
@@ -1336,7 +1343,7 @@ local function setAutoInteractEnabled(state)
 		end
 
 		autoInteractConnection = workspace.DescendantAdded:Connect(function(obj)
-			if isInstaInteractEnabled and obj:IsA("ProximityPrompt") then
+			if isAutoInteractEnabled and obj:IsA("ProximityPrompt") then
 				fireAutoInteract(obj)
 			end
 		end)
@@ -5217,4 +5224,4 @@ updateMobilePanelButtons()
 updateFlickButtons()
 applyVisibility()
 
-print("Cerber X V1.1 • Normal Loaded Successfully ✅")
+print("Cerber X V1.1 • Normal Loaded Sssuccessfully ✅")
