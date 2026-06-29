@@ -161,8 +161,8 @@ MobileCornerWalkRow = nil
 MobileXrayRow = nil
 MobileRealXrayRow = nil
 MobileDance2TurnRow = nil
+MobileInstaInteractRow = nil
 MobileAutoInteractRow = nil
-MobileAutoInteractRealRow = nil
 MobilePlayersESPRow = nil
 MobileFloorbangEspRow = nil
 MobileHideGuiRow = nil
@@ -177,10 +177,10 @@ mobileRealXraySwitch = nil
 mobileRealXrayKnob = nil
 mobileDance2TurnSwitch = nil
 mobileDance2TurnKnob = nil
+mobileInstaInteractSwitch = nil
+mobileInstaInteractKnob = nil
 mobileAutoInteractSwitch = nil
 mobileAutoInteractKnob = nil
-mobileAutoInteractRealSwitch = nil
-mobileAutoInteractRealKnob = nil
 mobilePlayersESPSwitch = nil
 mobilePlayersESPKnob = nil
 mobileFloorbangEspSwitch = nil
@@ -208,6 +208,7 @@ isCornerWalkEnabled = false
 isXrayEnabled = false
 realXrayEnabled = false -- X-ray removido
 isDance2TurnEnabled = false
+isInstaInteractEnabled = false
 isAutoInteractEnabled = false
 isPlayersESPEnabled = false
 isFloorbangEspEnabled = false -- Floorbang ESP removido
@@ -413,6 +414,7 @@ local function saveUserPreferences()
 		isCornerWalkEnabled = isCornerWalkEnabled,
 		isNonSpamEnabled = isXrayEnabled,
 		isDance2TurnEnabled = isDance2TurnEnabled,
+		isInstaInteractEnabled = isInstaInteractEnabled,
 		isAutoInteractEnabled = isAutoInteractEnabled,
 		isPlayersESPEnabled = isPlayersESPEnabled,
 		mobileWallhopGuiHidden = mobileWallhopGuiHidden,
@@ -469,6 +471,9 @@ local function loadUserPreferences()
 		end
 		if type(decoded.isDance2TurnEnabled) == "boolean" then
 			isDance2TurnEnabled = decoded.isDance2TurnEnabled
+		end
+		if type(decoded.isInstaInteractEnabled) == "boolean" then
+			isInstaInteractEnabled = decoded.isInstaInteractEnabled
 		end
 		if type(decoded.isAutoInteractEnabled) == "boolean" then
 			isAutoInteractEnabled = decoded.isAutoInteractEnabled
@@ -1242,25 +1247,21 @@ end
 
 local autoInteractTargets = {}
 local autoInteractOriginalHoldDurations = {}
-local autoInteractConnection = nil
-local autoInteractShownConnection = nil
-local isInstaInteractEnabled = false
 
-local function cacheAutoInteractTarget(obj)
+local function cacheInteractTarget(obj)
 	if obj and obj:IsA("ProximityPrompt") then
 		autoInteractTargets[obj] = true
 	end
 end
 
-local function scanAutoInteractTargets()
+local function scanInteractTargets()
 	table.clear(autoInteractTargets)
-
 	for _, obj in ipairs(workspace:GetDescendants()) do
-		cacheAutoInteractTarget(obj)
+		cacheInteractTarget(obj)
 	end
 end
 
-local function applyInstantAutoInteractToPrompt(prompt)
+local function applyInstantInteractToPrompt(prompt)
 	if not prompt or not prompt.Parent or not prompt:IsA("ProximityPrompt") then
 		autoInteractTargets[prompt] = nil
 		return
@@ -1270,116 +1271,95 @@ local function applyInstantAutoInteractToPrompt(prompt)
 		autoInteractOriginalHoldDurations[prompt] = prompt.HoldDuration
 	end
 
-	-- Faz o botão de interação concluir instantaneamente quando o usuário toca/clica nele.
 	if prompt.HoldDuration ~= 0 then
-		pcall(function()
-			prompt.HoldDuration = 0
-		end)
+		pcall(function() prompt.HoldDuration = 0 end)
 	end
 end
 
-local function applyInstantAutoInteract()
-	for prompt in pairs(autoInteractTargets) do
-		applyInstantAutoInteractToPrompt(prompt)
-	end
-end
-
-local function restoreAutoInteractPrompts()
+local function restoreInteractPrompts()
 	for prompt, oldHoldDuration in pairs(autoInteractOriginalHoldDurations) do
 		if prompt and prompt.Parent and prompt:IsA("ProximityPrompt") then
-			pcall(function()
-				prompt.HoldDuration = oldHoldDuration
-			end)
+			pcall(function() prompt.HoldDuration = oldHoldDuration end)
 		end
 	end
-
 	table.clear(autoInteractOriginalHoldDurations)
 end
 
 local function setInstaInteractEnabled(state)
 	isInstaInteractEnabled = state and true or false
-
-	if isInstaInteractEnabled then
-		scanAutoInteractTargets()
-		applyInstantAutoInteract()
+	if isInstaInteractEnabled or isAutoInteractEnabled then
+		scanInteractTargets()
 	else
-		restoreAutoInteractPrompts()
+		restoreInteractPrompts()
 	end
-
 	updateMobilePanelButtons()
 	saveUserPreferences()
 end
 
-local function fireAutoInteract(prompt)
-	if not isAutoInteractEnabled or not prompt or not prompt.Parent or not prompt:IsA("ProximityPrompt") then
-		return
-	end
-
-	pcall(function()
-		if fireproximityprompt then
-			fireproximityprompt(prompt)
-		end
-	end)
-end
-
 local function setAutoInteractEnabled(state)
 	isAutoInteractEnabled = state and true or false
-
-	if autoInteractConnection then
-		autoInteractConnection:Disconnect()
-		autoInteractConnection = nil
+	if isInstaInteractEnabled or isAutoInteractEnabled then
+		scanInteractTargets()
+	else
+		restoreInteractPrompts()
 	end
-
-	if autoInteractShownConnection then
-		autoInteractShownConnection:Disconnect()
-		autoInteractShownConnection = nil
-	end
-
-	if isAutoInteractEnabled then
-		for _, obj in ipairs(workspace:GetDescendants()) do
-			if obj:IsA("ProximityPrompt") then
-				fireAutoInteract(obj)
-			end
-		end
-
-		autoInteractConnection = workspace.DescendantAdded:Connect(function(obj)
-			if isAutoInteractEnabled and obj:IsA("ProximityPrompt") then
-				fireAutoInteract(obj)
-			end
-		end)
-	end
-
 	updateMobilePanelButtons()
 	saveUserPreferences()
 end
 
 workspace.DescendantAdded:Connect(function(obj)
-	cacheAutoInteractTarget(obj)
-
-	if isInstaInteractEnabled and obj:IsA("ProximityPrompt") then
-		task.defer(function()
-			applyInstantAutoInteractToPrompt(obj)
-		end)
-	end
+	cacheInteractTarget(obj)
 end)
 
 workspace.DescendantRemoving:Connect(function(obj)
 	if autoInteractTargets[obj] then
 		autoInteractTargets[obj] = nil
 	end
-
 	if autoInteractOriginalHoldDurations[obj] ~= nil then
 		autoInteractOriginalHoldDurations[obj] = nil
 	end
 end)
+
+local function runTrueAutoInteract()
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	for prompt in pairs(autoInteractTargets) do
+		if prompt and prompt.Parent and prompt.Enabled then
+			local part = prompt.Parent
+			local pos = part:IsA("BasePart") and part.Position or (part:IsA("Model") and part:GetPivot().Position or nil)
+			
+			if pos then
+				local dist = (hrp.Position - pos).Magnitude
+				if dist <= prompt.MaxActivationDistance then
+					pcall(function()
+						if fireproximityprompt then
+							fireproximityprompt(prompt, 1, true)
+						else
+							prompt:InputHoldBegin()
+							task.delay(0.05, function() prompt:InputHoldEnd() end)
+						end
+					end)
+				end
+			end
+		end
+	end
+end
 
 RunService.Heartbeat:Connect(function()
 	if isThisScriptActive and not isThisScriptActive() then
 		return
 	end
 
-	if isInstaInteractEnabled then
-		applyInstantAutoInteract()
+	if isInstaInteractEnabled or isAutoInteractEnabled then
+		for prompt in pairs(autoInteractTargets) do
+			applyInstantInteractToPrompt(prompt)
+		end
+	end
+
+	if isAutoInteractEnabled then
+		runTrueAutoInteract()
 	end
 end)
 
@@ -1511,8 +1491,11 @@ updateMobilePanelButtons = function()
 	if MobileDance2TurnRow and MobileDance2TurnRow:FindFirstChild("Label") then
 		MobileDance2TurnRow.Label.Text = "Clip Dance2"
 	end
+	if MobileInstaInteractRow and MobileInstaInteractRow:FindFirstChild("Label") then
+		MobileInstaInteractRow.Label.Text = "Insta-interact"
+	end
 	if MobileAutoInteractRow and MobileAutoInteractRow:FindFirstChild("Label") then
-		MobileAutoInteractRow.Label.Text = "Insta-interact"
+		MobileAutoInteractRow.Label.Text = "Auto-interact"
 	end
 	if MobilePlayersESPRow and MobilePlayersESPRow:FindFirstChild("Label") then
 		MobilePlayersESPRow.Label.Text = "Players ESP"
@@ -1534,8 +1517,8 @@ updateMobilePanelButtons = function()
 	updateSwitchVisual(mobileCornerWalkSwitch, mobileCornerWalkKnob, mobileCornerWalkButtonVisible)
 	updateSwitchVisual(mobileXraySwitch, mobileXrayKnob, isXrayEnabled)
 	updateSwitchVisual(mobileDance2TurnSwitch, mobileDance2TurnKnob, isDance2TurnEnabled)
-	updateSwitchVisual(mobileAutoInteractSwitch, mobileAutoInteractKnob, isInstaInteractEnabled)
-	updateSwitchVisual(mobileAutoInteractRealSwitch, mobileAutoInteractRealKnob, isAutoInteractEnabled)
+	updateSwitchVisual(mobileInstaInteractSwitch, mobileInstaInteractKnob, isInstaInteractEnabled)
+	updateSwitchVisual(mobileAutoInteractSwitch, mobileAutoInteractKnob, isAutoInteractEnabled)
 	updateSwitchVisual(mobilePlayersESPSwitch, mobilePlayersESPKnob, isPlayersESPEnabled)
 
 	setMobileWallhopVisualHidden(mobileWallhopGuiHidden)
@@ -2625,8 +2608,8 @@ local function buildMobileGui()
 	MobileXrayRow, mobileXraySwitch, mobileXrayKnob = createSwitchRow(MobileFunctionsPage, 72, "Non-spam")
 	MobileCornerWalkRow, mobileCornerWalkSwitch, mobileCornerWalkKnob = createSwitchRow(MobileFunctionsPage, 114, "Corner Walk")
 	MobileDance2TurnRow, mobileDance2TurnSwitch, mobileDance2TurnKnob = createSwitchRow(MobileFunctionsPage, 156, "Clip Dance2")
-	MobileAutoInteractRow, mobileAutoInteractSwitch, mobileAutoInteractKnob = createSwitchRow(MobileFunctionsPage, 198, "Insta-interact")
-	MobileAutoInteractRealRow, mobileAutoInteractRealSwitch, mobileAutoInteractRealKnob = createSwitchRow(MobileFunctionsPage, 240, "Auto-interact")
+	MobileInstaInteractRow, mobileInstaInteractSwitch, mobileInstaInteractKnob = createSwitchRow(MobileFunctionsPage, 198, "Insta-interact")
+	MobileAutoInteractRow, mobileAutoInteractSwitch, mobileAutoInteractKnob = createSwitchRow(MobileFunctionsPage, 240, "Auto-interact")
 	MobilePlayersESPRow, mobilePlayersESPSwitch, mobilePlayersESPKnob = createSwitchRow(MobileFunctionsPage, 282, "Players ESP")
 
 	MobileFlickTypesTitle = Instance.new("TextLabel")
@@ -2839,11 +2822,11 @@ local function buildMobileGui()
 		setDance2TurnEnabled(not isDance2TurnEnabled)
 	end)
 
-	bindRowPress(MobileAutoInteractRow and MobileAutoInteractRow:FindFirstChild("SwitchHitbox"), function()
+	bindRowPress(MobileInstaInteractRow and MobileInstaInteractRow:FindFirstChild("SwitchHitbox"), function()
 		setInstaInteractEnabled(not isInstaInteractEnabled)
 	end)
 
-	bindRowPress(MobileAutoInteractRealRow and MobileAutoInteractRealRow:FindFirstChild("SwitchHitbox"), function()
+	bindRowPress(MobileAutoInteractRow and MobileAutoInteractRow:FindFirstChild("SwitchHitbox"), function()
 		setAutoInteractEnabled(not isAutoInteractEnabled)
 	end)
 
@@ -2881,8 +2864,8 @@ local function buildMobileGui()
 	end)
 
 	switchMobileTab("Functions")
-	if isAutoInteractEnabled then
-		scanAutoInteractTargets()
+	if isInstaInteractEnabled or isAutoInteractEnabled then
+		scanInteractTargets()
 	end
 	if isPlayersESPEnabled then
 		updatePlayersESP()
@@ -5224,4 +5207,4 @@ updateMobilePanelButtons()
 updateFlickButtons()
 applyVisibility()
 
-print("Cerber X V1.1 • Normal Loaded Sssuccessfully ✅")
+print("Cerber X V1.1 • Normal Loaded Successfully ✅")
