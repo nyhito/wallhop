@@ -122,8 +122,7 @@ updateFlickButtons = nil switchPcTab = nil switchMobileTab = nil
 isWallHopEnabled = false isSlowEnabled = false – Beast Slow removido
 isCornerWalkEnabled = false isXrayEnabled = false realXrayEnabled =
 false – X-ray removido isDance2TurnEnabled = false isAutoInteractEnabled
-= false – Auto-interact real isInstaInteractEnabled = false –
-Insta-interact (HoldDuration 0) isPlayersESPEnabled = false
+= false isInstaInteractEnabled = false isPlayersESPEnabled = false
 isFloorbangEspEnabled = false – Floorbang ESP removido
 playerESPHighlights = {} floorbangEspMarkers = {}
 FLOORBANG_HORIZONTAL_RANGE = 35 dance2TurnToken = 0 dance2NoclipActive =
@@ -1105,8 +1104,11 @@ state and true or false
 
 end
 
-local function autoInteractPrompt(prompt) if not isAutoInteractEnabled
-or not prompt or not prompt.Parent then return end
+local autoInteractConnection = nil
+
+local function fireAutoInteract(prompt) if not isAutoInteractEnabled or
+not prompt or not prompt.Parent or not prompt:IsA(“ProximityPrompt”)
+then return end
 
     pcall(function()
         if fireproximityprompt then
@@ -1120,15 +1122,28 @@ or not prompt or not prompt.Parent then return end
 
 end
 
-local function scanAutoInteractTargets() for _, obj in
-ipairs(workspace:GetDescendants()) do if obj:IsA(“ProximityPrompt”) then
-autoInteractPrompt(obj) end end end
-
 local function setAutoInteractEnabled(state) isAutoInteractEnabled =
 state and true or false
 
+    if autoInteractConnection then
+        autoInteractConnection:Disconnect()
+        autoInteractConnection = nil
+    end
+
     if isAutoInteractEnabled then
-        scanAutoInteractTargets()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                fireAutoInteract(obj)
+            end
+        end
+
+        autoInteractConnection = workspace.DescendantAdded:Connect(function(obj)
+            if isAutoInteractEnabled and obj:IsA("ProximityPrompt") then
+                task.defer(function()
+                    fireAutoInteract(obj)
+                end)
+            end
+        end)
     end
 
     updateMobilePanelButtons()
@@ -1138,12 +1153,6 @@ end
 
 workspace.DescendantAdded:Connect(function(obj)
 cacheInstaInteractTarget(obj)
-
-    if isAutoInteractEnabled and obj:IsA("ProximityPrompt") then
-        task.defer(function()
-            autoInteractPrompt(obj)
-        end)
-    end
 
     if isInstaInteractEnabled and obj:IsA("ProximityPrompt") then
         task.defer(function()
@@ -1164,10 +1173,6 @@ end)
 
 RunService.Heartbeat:Connect(function() if isThisScriptActive and not
 isThisScriptActive() then return end
-
-    if isAutoInteractEnabled then
-        scanAutoInteractTargets()
-    end
 
     if isInstaInteractEnabled then
         applyInstaInteract()
@@ -1298,7 +1303,6 @@ MobileConsoleWallhopRow.Label.Text = “Console Wallhop” end
     updateSwitchVisual(mobileXraySwitch, mobileXrayKnob, isXrayEnabled)
     updateSwitchVisual(mobileDance2TurnSwitch, mobileDance2TurnKnob, isDance2TurnEnabled)
     updateSwitchVisual(mobileAutoInteractSwitch, mobileAutoInteractKnob, isInstaInteractEnabled)
-    updateSwitchVisual(mobileAutoInteractRealSwitch, mobileAutoInteractRealKnob, isAutoInteractEnabled)
     updateSwitchVisual(mobilePlayersESPSwitch, mobilePlayersESPKnob, isPlayersESPEnabled)
 
     setMobileWallhopVisualHidden(mobileWallhopGuiHidden)
@@ -2279,7 +2283,7 @@ isFloorbangEspEnabled = false mobileBeastSlowButtonVisible = false
     MobileCornerWalkRow, mobileCornerWalkSwitch, mobileCornerWalkKnob = createSwitchRow(MobileFunctionsPage, 114, "Corner Walk")
     MobileDance2TurnRow, mobileDance2TurnSwitch, mobileDance2TurnKnob = createSwitchRow(MobileFunctionsPage, 156, "Clip Dance2")
     MobileAutoInteractRow, mobileAutoInteractSwitch, mobileAutoInteractKnob = createSwitchRow(MobileFunctionsPage, 198, "Insta-interact")
-    MobileAutoInteractRealRow, mobileAutoInteractRealSwitch, mobileAutoInteractRealKnob = createSwitchRow(MobileFunctionsPage, 240, "Auto-interact")
+    MobileAutoInteractRealRow, mobileAutoInteractRealSwitch, mobileAutoInteractRealKnob = createSwitchRow(MobileFunctionsPage, 282, "Auto-interact")
     MobilePlayersESPRow, mobilePlayersESPSwitch, mobilePlayersESPKnob = createSwitchRow(MobileFunctionsPage, 240, "Players ESP")
 
     MobileFlickTypesTitle = Instance.new("TextLabel")
