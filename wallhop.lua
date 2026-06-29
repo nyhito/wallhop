@@ -1361,6 +1361,10 @@ RunService.Heartbeat:Connect(function()
 	if isAutoInteractEnabled then
 		runTrueAutoInteract()
 	end
+
+	if isPlayersESPEnabled then
+		updatePlayersESP()
+	end
 end)
 
 
@@ -1400,15 +1404,15 @@ local function createOrUpdatePlayersESP(player)
 		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 		highlight.FillTransparency = 0.45
 		highlight.OutlineTransparency = 0.1
-		highlight.FillColor = Color3.fromRGB(45, 45, 48)
-		highlight.OutlineColor = Color3.fromRGB(45, 45, 48)
+		highlight.FillColor = Color3.fromRGB(255, 0, 0)
+		highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
 		highlight.Parent = character
 		playerESPHighlights[player] = highlight
 	end
 
 	highlight.Adornee = character
-	highlight.FillColor = Color3.fromRGB(45, 45, 48)
-	highlight.OutlineColor = Color3.fromRGB(45, 45, 48)
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
 end
 
 local function updatePlayersESP()
@@ -1445,7 +1449,6 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function()
-		task.wait(0.25)
 		if isPlayersESPEnabled then
 			createOrUpdatePlayersESP(player)
 		end
@@ -1459,7 +1462,6 @@ end)
 for _, player in ipairs(Players:GetPlayers()) do
 	if player ~= LocalPlayer then
 		player.CharacterAdded:Connect(function()
-			task.wait(0.25)
 			if isPlayersESPEnabled then
 				createOrUpdatePlayersESP(player)
 			end
@@ -1877,6 +1879,9 @@ end
 local function setMobileGuiHidden(state)
 	mobileWallhopGuiHidden = state and true or false
 	updateMobilePanelButtons()
+	if applyVisibility then
+		applyVisibility()
+	end
 	saveUserPreferences()
 end
 
